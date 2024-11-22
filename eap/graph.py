@@ -369,7 +369,7 @@ class Graph:
                 residual_stream += attn_nodes
                 residual_stream.append(mlp_node)
 
-            else:
+            else: # PLACEHOLDER
                 for node in residual_stream:
                     for attn_node in attn_nodes:     
                         for letter in 'qkv':           

@@ -28,6 +28,10 @@ def make_hooks_and_matrices(model: HookedTransformer, graph: Graph, batch_size:i
     """
     activation_difference = torch.zeros((batch_size, n_pos, graph.n_forward, model.cfg.d_model), device='cuda', dtype=model.cfg.dtype)
 
+    # # testing
+    # print(activation_difference.shape)
+    # print(activation_difference.dtype)
+
     processed_attn_layers = set()
     fwd_hooks_clean = []
     fwd_hooks_corrupted = []
@@ -142,23 +146,60 @@ def get_scores_eap(model: HookedTransformer, graph: Graph, dataloader:DataLoader
 
 def get_scores_eap_ig(model: HookedTransformer, graph: Graph, dataloader: DataLoader, metric: Callable[[Tensor], Tensor], steps=30, quiet=False):
     scores = torch.zeros((graph.n_forward, graph.n_backward), device='cuda', dtype=model.cfg.dtype)    
+
+    # testing
+    # print(model.cfg.dtype)
+    # print(scores.shape)
     
     total_items = 0
     dataloader = dataloader if quiet else tqdm(dataloader)
     for clean, corrupted, label in dataloader:
+
+        # # testing
+        # print(clean)
+        # print(corrupted)
+        # print(label)
+
         batch_size = len(clean)
         total_items += batch_size
 
         clean_tokens, attention_mask, input_lengths, n_pos = tokenize_plus(model, clean)
         corrupted_tokens, _, _, _ = tokenize_plus(model, corrupted)
 
+        # # testing
+        # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        # free_mem, total_mem = torch.cuda.mem_get_info(device)
+        # print(f'free_mem (in gb): {free_mem/10 ** 9:.2f}')
+        # print(f'free_mem (in gb): {total_mem/10 ** 9:.2f}')
+
         (fwd_hooks_corrupted, fwd_hooks_clean, bwd_hooks), activation_difference = make_hooks_and_matrices(model, graph, batch_size, n_pos, scores)
+
+        # # testing
+        # print('gpu memory usage after installing hooks and creating activation_difference matrix')
+        # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        # free_mem, total_mem = torch.cuda.mem_get_info(device)
+        # print(f'free_mem (in gb): {free_mem/10 ** 9:.2f}')
+        # print(f'free_mem (in gb): {total_mem/10 ** 9:.2f}')
 
         with torch.inference_mode():
             with model.hooks(fwd_hooks=fwd_hooks_corrupted):
                 _ = model(corrupted_tokens, attention_mask=attention_mask)
 
+            # their method:
+            #           correct_label_token = dataset (are)
+            #           corrupted_label_token = corrupted forward pass (is)
+
+            # our method:
+            #           correct_label_token = dataset ('))')
+            #           corrupted_label_token (counter_factual_label) = 
             input_activations_corrupted = activation_difference[:, :, graph.forward_index(graph.nodes['input'])].clone()
+
+            # # testing
+            # print('gpu memory usage after corrupted run')
+            # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+            # free_mem, total_mem = torch.cuda.mem_get_info(device)
+            # print(f'free_mem (in gb): {free_mem/10 ** 9:.2f}')
+            # print(f'free_mem (in gb): {total_mem/10 ** 9:.2f}')
 
             with model.hooks(fwd_hooks=fwd_hooks_clean):
                 clean_logits = model(clean_tokens, attention_mask=attention_mask)
@@ -172,13 +213,33 @@ def get_scores_eap_ig(model: HookedTransformer, graph: Graph, dataloader: DataLo
                 return new_input
             return hook_fn
 
+        # # testing
+        # print('gpu memory usage after clean run')
+        # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        # free_mem, total_mem = torch.cuda.mem_get_info(device)
+        # print(f'free_mem (in gb): {free_mem/10 ** 9:.2f}')
+        # print(f'free_mem (in gb): {total_mem/10 ** 9:.2f}')
+
         total_steps = 0
         for step in range(1, steps+1):
             total_steps += 1
+            # PLACEHOLDER
             with model.hooks(fwd_hooks=[(graph.nodes['input'].out_hook, input_interpolation_hook(step))], bwd_hooks=bwd_hooks):
+                # NOTE : run out of gpu memory here on 80gb
                 logits = model(clean_tokens, attention_mask=attention_mask)
                 metric_value = metric(logits, clean_logits, input_lengths, label)
                 metric_value.backward()
+
+            # # testing
+            # print('gpu memory usage after clean run')
+            # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+            # free_mem, total_mem = torch.cuda.mem_get_info(device)
+            # print(f'free_mem (in gb): {free_mem/10 ** 9:.2f}')
+            # print(f'free_mem (in gb): {total_mem/10 ** 9:.2f}')
+
+        # testing
+        # print('hello i made it here')
+        # exit(1)
 
     scores /= total_items
     scores /= total_steps
