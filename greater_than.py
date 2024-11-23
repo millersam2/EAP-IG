@@ -12,9 +12,11 @@ from eap.attribute import attribute
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 def collate_EAP(xs):
-    clean, corrupted, labels = zip(*xs)
+    # breakpoint()
+    clean, corrupted, labels, counterfactual_labels = zip(*xs)
     clean = list(clean)
     corrupted = list(corrupted)
+    labels = tuple([(labels[i], counterfactual_labels[i]) for i in range(0, len(labels))])
     return clean, corrupted, labels
 
 class EAPDataset(Dataset):
@@ -32,7 +34,7 @@ class EAPDataset(Dataset):
     
     def __getitem__(self, index):
         row = self.df.iloc[index]
-        return row['clean'], row['corrupted'], row['label']
+        return row['clean'], row['corrupted'], row['label'], row['counterfactual_label']
     
     def to_dataloader(self, batch_size: int):
         return DataLoader(self, batch_size=batch_size, collate_fn=collate_EAP)
@@ -44,30 +46,17 @@ def get_logit_positions(logits: torch.Tensor, input_length: torch.Tensor):
     logits = logits[idx, input_length - 1]
     return logits
 
-# TODO - modify this function for use with closing parentheses problem
+# NOTE - modified for closing paren problem
 def get_prob_diff(tokenizer: PreTrainedTokenizer):
-    year_indices = torch.tensor([tokenizer(f'{year:02d}').input_ids[0] for year in range(100)])
-
-    # testing
-    # year_indices = []
-    # for year in range(100):
-    #     token_ids = tokenizer(f'{year:02d}').input_ids
-    #     tokens = tokenizer.tokenize(f'{year:02d}')
-    #     print(f'input str: {year:02d} ; token_ids: {token_ids} ; tokens : {tokens}')
-    #     year_indices.append(token_ids[0])
-    # year_indices = torch.tensor(year_indices)
-    # exit(1)
-
-
     def prob_diff(logits: torch.Tensor, clean_logits: torch.Tensor, input_length: torch.Tensor, labels: torch.Tensor, mean=True, loss=False):
+        # breakpoint()
         logits = get_logit_positions(logits, input_length)
-        probs = torch.softmax(logits, dim=-1)[:, year_indices]
-
+        probs = torch.softmax(logits, dim=-1)#[:, year_indices]
+        # breakpoint()
         results = []
-        for prob, year in zip(probs, labels):
-            results.append(prob[year + 1 :].sum() - prob[: year + 1].sum())
-        
-        # testing
+        for prob, (label, counterfactual_label) in zip(probs, labels):
+            results.append(prob[label] - prob[counterfactual_label])
+
         print(results)
 
         results = torch.stack(results)
@@ -106,59 +95,31 @@ model.cfg.use_hook_mlp_in = True
 # from_pretrained
 torch.cuda.empty_cache()
 
-ds = EAPDataset('greater_than_data.csv')
+# ds = EAPDataset('greater_than_data.csv')
+ds = EAPDataset('correct_paren_data.csv')
 # dataloader = ds.to_dataloader(120)
-dataloader = ds.to_dataloader(5)
+dataloader = ds.to_dataloader(1)
 prob_diff = get_prob_diff(model.tokenizer)
-
-# ## EAP vanilla
-# # Instantiate a graph with a model
-# g_eap = Graph.from_model(model)
-
-# # Attribute using the model, graph, clean / corrupted data and labels, as well as a metric
-# attribute(model, g_eap, dataloader, partial(prob_diff, loss=True, mean=True), method='EAP')
-
-# g_eap.apply_greedy(200)
-# g_eap.prune_dead_nodes()
-
-# results_eap = evaluate_graph(model, g_eap, dataloader, partial(prob_diff, loss=False, mean=False)).mean().item()
-# print(f"Original performance was {baseline}; the circuit's performance is {results_eap}")
 
 ## EAP-IG vanilla
 # Instantiate a graph with a model
 g = Graph.from_model(model)
 
 # # Attribute using the model, graph, clean / corrupted data and labels, as well as a metric
-# attribute(model, g, dataloader, partial(prob_diff, loss=True, mean=True), method='EAP-IG', ig_steps=5)
+attribute(model, g, dataloader, partial(prob_diff, loss=True, mean=True), method='EAP-IG', ig_steps=5)
 
 # g.apply_topn(200, absolute=True)
+g.apply_greedy(4000)
 
-# print(g.count_included_nodes(), g.count_included_edges())
+print(g.count_included_nodes(), g.count_included_edges())
 
-# g.prune_dead_nodes()
+g.prune_dead_nodes()
 # g.to_json('graph.json')
 
 # gz = g.to_graphviz()
 # gz.draw(f'graph.png', prog='dot')
 
-# baseline = evaluate_baseline(model, dataloader, partial(prob_diff, loss=False, mean=False)).mean().item()
-# results = evaluate_graph(model, g, dataloader, partial(prob_diff, loss=False, mean=False)).mean().item()
-# print(f"Original performance was {baseline}; the circuit's performance is {results}")
-
-
-# print(g.count_included_nodes(), g.count_included_edges())
-
-
-
-# ## EAP_IG clean-corrupted variant
-# # Instantiate a graph with a model
-# g_cc = Graph.from_model(model)
-
-# # Attribute using the model, graph, clean / corrupted data and labels, as well as a metric
-# attribute(model, g_cc, dataloader, partial(prob_diff, loss=True, mean=True), method='clean-corrupted')
-
-# g_cc.apply_greedy(200)
-# g_cc.prune_dead_nodes()
-
-# results_cc = evaluate_graph(model, g_cc, dataloader, partial(prob_diff, loss=False, mean=False)).mean().item()
-# print(f"Original performance was {baseline}; the circuit's performance is {results_cc}")
+baseline = evaluate_baseline(model, dataloader, partial(prob_diff, loss=False, mean=False)).mean().item()
+results = evaluate_graph(model, g, dataloader, partial(prob_diff, loss=False, mean=False)).mean().item()
+print(f"Original performance was {baseline}; the circuit's performance is {results}")
+print(g.count_included_nodes(), g.count_included_edges())

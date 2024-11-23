@@ -144,6 +144,7 @@ def get_scores_eap(model: HookedTransformer, graph: Graph, dataloader:DataLoader
 
     return scores
 
+# NOTE: updated for closing paren task
 def get_scores_eap_ig(model: HookedTransformer, graph: Graph, dataloader: DataLoader, metric: Callable[[Tensor], Tensor], steps=30, quiet=False):
     scores = torch.zeros((graph.n_forward, graph.n_backward), device='cuda', dtype=model.cfg.dtype)    
 
@@ -154,12 +155,6 @@ def get_scores_eap_ig(model: HookedTransformer, graph: Graph, dataloader: DataLo
     total_items = 0
     dataloader = dataloader if quiet else tqdm(dataloader)
     for clean, corrupted, label in dataloader:
-
-        # # testing
-        # print(clean)
-        # print(corrupted)
-        # print(label)
-
         batch_size = len(clean)
         total_items += batch_size
 
@@ -223,7 +218,6 @@ def get_scores_eap_ig(model: HookedTransformer, graph: Graph, dataloader: DataLo
         total_steps = 0
         for step in range(1, steps+1):
             total_steps += 1
-            # PLACEHOLDER
             with model.hooks(fwd_hooks=[(graph.nodes['input'].out_hook, input_interpolation_hook(step))], bwd_hooks=bwd_hooks):
                 # NOTE : run out of gpu memory here on 80gb
                 logits = model(clean_tokens, attention_mask=attention_mask)

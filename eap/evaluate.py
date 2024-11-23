@@ -11,6 +11,7 @@ from einops import einsum
 from .graph import Graph, InputNode, LogitNode, AttentionNode, MLPNode, Node, Edge
 from .attribute import make_hooks_and_matrices, tokenize_plus
 
+# updated for closing paren task
 def evaluate_graph(model: HookedTransformer, graph: Graph, dataloader: DataLoader, metrics: Union[List[Callable[[Tensor], Tensor]],Callable[[Tensor], Tensor]], prune:bool=True, quiet=False):
     """
     Evaluate a circuit (i.e. a graph where only some nodes are false, probably created by calling graph.apply_threshold). You probably want to prune beforehand to make sure your circuit is valid.
@@ -25,6 +26,7 @@ def evaluate_graph(model: HookedTransformer, graph: Graph, dataloader: DataLoade
     Returns:
         List[Tensor], the results of the evaluation.
     """
+    # breakpoint()
     if prune:
         graph.prune_dead_nodes(prune_childless=True, prune_parentless=True)
 
@@ -116,6 +118,7 @@ def evaluate_graph(model: HookedTransformer, graph: Graph, dataloader: DataLoade
         results = results[0]
     return results
 
+# updated for closing paren task
 def evaluate_baseline(model: HookedTransformer, dataloader:DataLoader, metrics: Union[List[Callable[[Tensor], Tensor]],Callable[[Tensor], Tensor]], run_corrupted=False, quiet=False):
     """
     Evaluate a model with a dataloader and a list of metrics, using only the clean examples, and without considering which graph edges are in/out of the circuit
