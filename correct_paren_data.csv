@@ -1,0 +1,22 @@
+clean,corrupted,label,counterfactual_label
+"#print a string 1
+print(str(str(str(str(str(1))))","#print a string 1
+print(str(str(str(str(str(1))",876,4961
+"#print a string 2
+print(str(str(str(str(str(2))))","#print a string 2
+print(str(str(str(str(str(2))",876,4961
+"#print a string 3
+print(str(str(str(str(str(3))))","#print a string 3
+print(str(str(str(str(str(3))",876,4961
+"#print a string 12
+print(str(str(str(str(str(12))))","#print a string 12
+print(str(str(str(str(str(12))",876,4961
+"#print a string 23
+print(str(str(str(str(str(23))))","#print a string 23
+print(str(str(str(str(str(23))",876,4961
+"#print a string 123
+print(str(str(str(str(str(123))))","#print a string 123
+print(str(str(str(str(str(123))",876,4961
+"#print a string 123456789
+print(str(str(str(str(str(123456789))))","#print a string 123456789
+print(str(str(str(str(str(123456789))",876,4961

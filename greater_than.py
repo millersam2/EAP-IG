@@ -114,7 +114,7 @@ g.apply_greedy(4000)
 print(g.count_included_nodes(), g.count_included_edges())
 
 g.prune_dead_nodes()
-# g.to_json('graph.json')
+g.to_json('graph.json')
 
 # gz = g.to_graphviz()
 # gz.draw(f'graph.png', prog='dot')
